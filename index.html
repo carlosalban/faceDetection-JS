@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.1/css/bootstrap.min.css">
+	</head>
+	<body>
+		<div class="container">
+			<div class="row">
+				<div class="col-md-8">
+					<div class="page-header" style="margin:0px">
+						<h1>Web-Based Facial Detection</h1>
+					</div>
+				</div>
+				<div class="col-md-4">
+						<button class="btn btn-sm btn-success" id="startbutton" style="margin-top:25px">Take Photo</button>
+						<button type="button" id="detectBtn" class="btn btn-success btn-sm" style="margin-top:25px">Detect Face</button>	
+						<button type="button" id="isolateBtn" class="btn btn-success btn-sm" style="margin-top:25px">Isolate</button>
+			
+				</div>
+			</div>
+
+			<div class="row" style="margin-top:10px">
+				<div class="col-md-6">
+					<p class="lead">Live Capture</p>
+					<video id="video"></video>
+					<br>
+					
+				</div>
+				<div class="col-md-6">
+					<p class="lead">Grayscale and Equalize</p>
+					<canvas id="outputIMG"></canvas>
+				</div>
+
+			</div>
+			<div class="row">
+			<hr>
+				<div class="col-md-6">
+					<p class="lead">Snapshot</p>
+					<canvas id="canvas"></canvas><br>
+
+				</div>
+
+				<div class="col-md-6">
+					<p class="lead">Brightness Binary Feature</p>
+					<div id="bbfH"></div>
+					<div id="bbfW"></div>
+					<canvas id="isolate"></canvas>
+					<p></p>
+	
+				</div>
+			</div>
+			<div class="row">
+				<div class="col-md-4">
+				</div>
+				<div class="col-md-4">
+				</div>
+				<div class="col-md-4">
+				</div>
+			</div>
+
+		</div><!-- close container -->
+
+
+
+		<script src="//ajax.googleapis.com/ajax/libs/jquery/2.1.1/jquery.min.js"></script>
+		<script src="./js/jsfeat.js"></script>
+		<script src="./js/jsfeat_export.js"></script>
+		<script src="./js/jsfeat_fast_corners.js"></script>
+		<script src="./js/jsfeat_haar.js"></script>
+		<script src="./js/jsfeat_imgproc.js"></script>
+		<script src="./js/jsfeat_linalg.js"></script>
+		<script src="./js/jsfeat_mat_math.js"></script>
+		<script src="./js/jsfeat_math.js"></script>
+		<script src="./js/jsfeat_optical_flow_lk.js"></script>
+		<script src="./js/jsfeat_struct.js"></script>
+		<script src="./js/jsfeat_transform.js"></script>
+		<script src="./js/jsfeat_yape.js"></script>
+		<script src="./js/jsfeat_yape06.js"></script>
+		<script src="./js/jsfeat_bbf.js"></script>
+		<script src="./js/jsfeat_cache.js"></script>
+		<script src="./js/frontalface.js"></script>
+		<script src="./js/bbf_face.js"></script>
+		<script src="./js/jsfeat_orb.js"></script>
+		<script src="./js/jsfeat_motion_estimator.js"></script>
+
+		<script>
+		(function() {
+
+		  var streaming = false,
+		      video        = document.querySelector('#video'),
+		      canvas       = document.querySelector('#canvas'),
+		      photo        = document.querySelector('#outputIMG'),
+		      startbutton  = document.querySelector('#startbutton'),
+		      width = 320,
+		      height = 0;
+
+		  navigator.getMedia = ( navigator.getUserMedia ||
+		                         navigator.webkitGetUserMedia ||
+		                         navigator.mozGetUserMedia ||
+		                         navigator.msGetUserMedia);
+
+		  navigator.getMedia(
+		    {
+		      video: true,
+		      audio: false
+		    },
+		    function(stream) {
+		      if (navigator.mozGetUserMedia) {
+		        video.mozSrcObject = stream;
+		      } else {
+		        var vendorURL = window.URL || window.webkitURL;
+		        video.src = vendorURL.createObjectURL(stream);
+		      }
+		      video.play();
+		    },
+		    function(err) {
+		      console.log("An error occured! " + err);
+		    }
+		  );
+
+		  video.addEventListener('canplay', function(ev){
+		    if (!streaming) {
+		      height = video.videoHeight / (video.videoWidth/width);
+		      video.setAttribute('width', width);
+		      video.setAttribute('height', height);
+		      canvas.setAttribute('width', width);
+		      canvas.setAttribute('height', height);
+		      streaming = true;
+		    }
+		  }, false);
+
+		  function takepicture() {
+		    canvas.width = width;
+		    canvas.height = height;
+		    canvas.getContext('2d').drawImage(video, 0, 0, width, height);
+		    var data = canvas.toDataURL('image/png');
+		    photo.setAttribute('src', data);
+		  }
+
+		  startbutton.addEventListener('click', function(ev){
+		      takepicture();
+		    ev.preventDefault();
+		  }, false);
+
+		})();
+		</script>
+
+		<script>
+			$('#detectBtn').click(function(){
+
+				var sampleIMG = new Image();
+				//get sample/input image
+				sampleIMG.src = $('#outputIMG').attr('src'); 
+				sampleIMG.onload = function() {
+
+					var width =  sampleIMG.width;
+					var height = sampleIMG.height;
+
+					//result canvas
+					var result = document.getElementById("outputIMG");
+					result.width = width;
+					result.height = height;
+					var ctx = result.getContext('2d');
+
+					//temp canvas
+					var canvas = document.createElement('canvas');
+					canvas.width = width;
+					canvas.height = height;
+					var context2d = canvas.getContext('2d');
+					context2d.drawImage(sampleIMG, 0, 0, width, height);
+					var image_data = context2d.getImageData(0, 0, width, height);
+
+					var gray_img = new jsfeat.matrix_t(width, height, jsfeat.U8_t | jsfeat.C1_t);
+
+					
+					jsfeat.imgproc.grayscale(image_data.data, width, height, gray_img);
+					
+
+
+					var data_u32 = new Uint32Array(image_data.data.buffer);
+					var alpha = (0xff << 24);
+					var i = gray_img.cols*gray_img.rows, pix = 0;
+
+					while(--i >= 0) {
+						pix =gray_img.data[i];
+						data_u32[i] = alpha | (pix << 16) | (pix << 8) | pix;
+					}
+
+					jsfeat.imgproc.equalize_histogram(gray_img, gray_img); //added now
+            		ctx.putImageData(image_data, 0, 0);
+
+            		jsfeat.bbf.prepare_cascade(jsfeat.bbf.face_cascade);
+            		var pyr = jsfeat.bbf.build_pyramid(gray_img, 24*2, 24*2, 4);
+
+                    var rects = jsfeat.bbf.detect(pyr, jsfeat.bbf.face_cascade);
+                    rects = jsfeat.bbf.group_rectangles(rects, 1);
+
+
+                    // draw only most confident one
+                    draw_faces(ctx, rects, width/gray_img.cols, 1);
+
+                    var detectData;
+
+                    var rectH;
+                    var rectW;
+
+            		function draw_faces(ctx, rects, sc, max) {
+		                var on = rects.length;
+		                if(on && max) {
+		                    jsfeat.math.qsort(rects, 0, on-1, function(a,b){return (b.confidence<a.confidence);})
+		                }
+		                var n = max || on;
+		                n = Math.min(n, on);
+		                var r;
+		                for(var i = 0; i < n; ++i) {
+		                    r = rects[i];
+		                    ctx.strokeRect((r.x*sc)|0,(r.y*sc)|0,(r.width*sc)|0,(r.height*sc)|0);
+		                    rectH = r.y*sc;
+		                    rectW = r.x*sc;
+		                    console.log('height is ' + r.y*sc);
+		                    console.log('width is ' + r.x*sc);
+		                    detectData = ctx.getImageData(((r.x*sc)+1)|0,((r.y*sc)+1)|0,((r.width*sc)-2)|0,((r.height*sc)-2)|0);
+		                }
+            		}
+
+            		if (!rects){
+
+
+            		}
+
+					
+					$('#isolateBtn').click(function(){
+						var isolate = document.getElementById("isolate");
+
+						$('#bbfH').text("Height is " + rectH.toFixed(0) + " px");
+						$('#bbfW').text("Width is " + rectW.toFixed(0) + " px");
+						var ctx = isolate.getContext('2d');
+						ctx.clearRect(0, 0, canvas.width, canvas.height);
+						ctx.putImageData(detectData, 0, 0);
+
+					});
+				};
+
+			});
+
+		function downloadCanvas(link, canvasId, filename) {
+			console.log('download called!')
+			link.href = document.getElementById(canvasId).toDataURL();
+			link.download = filename;
+		}
+
+		$('#downloadBtn').click(function(){
+			console.log('clicked');
+    		downloadCanvas(this, 'isolate', 'isolate.png');
+		});
+
+		</script>
+
+	</body>
+</html>
