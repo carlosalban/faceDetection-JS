@@ -10,8 +10,6 @@ Well sort of. Your browser must support WebRTC. Chrome does this natively. IE an
 
 You need a connected camera to your computer in order for this to function.
 
-Live Demo Here: http://glass.omegatango.com
-
 Credits and More about jsfeat:
 http://inspirit.github.io/jsfeat/
 
